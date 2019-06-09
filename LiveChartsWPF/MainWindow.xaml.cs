@@ -1,10 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO.Ports;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Linq;
 using LiveCharts;
 using LiveCharts.Configurations;
+using System.Text;
+using System.Windows.Threading;
+using System.Windows.Controls;
 
 namespace LiveChartsWPF
 {
@@ -13,41 +19,155 @@ namespace LiveChartsWPF
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        private double _axisMax;
-        private double _axisMin;
+        private SerialPort _serialPort;
+        DispatcherTimer timer;
         private double _trend;
+        private int cont = 0;
+        public bool IsReading { get; set; }
 
         public MainWindow()
         {
             InitializeComponent();
+            /*_serialPort = new SerialPort("COM3", 115200, Parity.None, 8, StopBits.One);
+            _serialPort.ReadTimeout = 2000;*/
+            timer = new DispatcherTimer();
+            timer.Tick += TimerTick;
+            timer.Interval = new TimeSpan(0, 0, 1);
+            timer.Start();
 
-            var mapper = Mappers.Xy<MeasureModel>()
-                .X(model => model.DateTime.Ticks)   //use DateTime.Ticks as X
-                .Y(model => model.Value);           //use the value property as Y
-
-            //lets save the mapper globally.
-            Charting.For<MeasureModel>(mapper);
-
-            //the values property will store our values array
-            ChartValues = new ChartValues<MeasureModel>();
-
-            //lets set how to display the X Labels
-            DateTimeFormatter = value => new DateTime((long)value).ToString("mm:ss");
-
-            //AxisStep forces the distance between each separator in the X axis
-            AxisStep = TimeSpan.FromSeconds(1).Ticks;
-            //AxisUnit forces lets the axis know that we are plotting seconds
-            //this is not always necessary, but it can prevent wrong labeling
-            AxisUnit = TimeSpan.TicksPerSecond;
-
-            SetAxisLimits(DateTime.Now);
-
-            //The next code simulates data changes every 300 ms
-
+            ConfigureChart();
+            
             IsReading = false;
 
             DataContext = this;
         }
+
+        private void TimerTick(object sender, EventArgs e)
+        {
+            int i = 0;
+            bool quantDiferente = false; //flag para sinalizar que a quantidade de portas mudou
+
+            //se a quantidade de portas mudou
+            if (ComboBox1.Items.Count == SerialPort.GetPortNames().Length)
+            {
+                foreach (string s in SerialPort.GetPortNames())
+                {
+                    if (!ComboBox1.Items[i++].Equals(s))
+                    {
+                        quantDiferente = true;
+                    }
+                }
+            }
+            else
+            {
+                quantDiferente = true;
+            }
+
+            //Se não foi detectado diferença
+            if (quantDiferente == false && SerialPort.GetPortNames().Length != 0)
+            {
+                return;                     //retorna
+            }
+
+            //limpa comboBox
+            ComboBox1.Items.Clear();
+
+            if (SerialPort.GetPortNames().Length == 0)
+            {
+                ComboBox1.Items.Add("No COM Ports Available");
+            }
+            else
+            {
+                //adiciona todas as COM diponíveis na lista
+                foreach (string s in SerialPort.GetPortNames())
+                {
+                    ComboBox1.Items.Add(s);
+                }
+            }
+
+            //seleciona a primeira posição da lista
+            ComboBox1.SelectedIndex = 0;
+        }
+
+        private void Read()
+        {
+            var r = new Random();
+
+            while (IsReading)
+            {
+                
+                var now = DateTime.Now;
+                Thread.Sleep(150);
+                cont += 1;
+
+                if (cont == 10)
+                {
+                    cont = 0;
+                    _trend = r.Next(-5, 3);
+                }
+
+                AddChartValue(now, _trend);
+
+
+                /* COM PORT READ */
+                /*//if (!_serialPort.IsOpen)
+                    //_serialPort.Open();
+                _serialPort.DiscardInBuffer();
+                Thread.Sleep(2000);
+
+                byte[] byteBuffer = new byte[4];
+                _serialPort.Read(byteBuffer, 0, 4);
+                var stringValue = Encoding.ASCII.GetString(byteBuffer);
+                double value = Convert.ToDouble(stringValue.Replace('.', ','));
+                
+                //_serialPort.Close();
+
+                AddChartValue(now, value);
+                /*****************/
+            }
+        }
+
+        bool isopen = false;
+        private void ConnectClick(object sender, RoutedEventArgs e)
+        {
+            var portName = ComboBox1.Items[ComboBox1.SelectedIndex].ToString();
+            if (!portName.Equals("No COM Ports Available"))
+            {
+                MessageBox.Show("There are no COM ports available to connect.", "Error", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK, MessageBoxOptions.DefaultDesktopOnly);
+                return;
+            }
+            //if (!_serialPort.IsOpen)
+            if (!isopen)
+            {
+                ComboBox1.IsEnabled = false;
+                //_serialPort.PortName = portName;
+                //_serialPort.Open();
+                IsReading = true;
+                isopen = true;
+                Task.Factory.StartNew(Read);
+            }
+            else
+            {
+                IsReading = false;
+                isopen = false;
+                //_serialPort.Close();
+                ComboBox1.IsEnabled = true;
+            }
+            //BtnConnect.Content = _serialPort.IsOpen ? "Disconnect" : "Connect";
+            BtnConnect.Content = isopen ? "Disconnect" : "Connect";
+        }
+
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            if (_serialPort != null && _serialPort.IsOpen)
+                _serialPort.Close();
+        }
+
+        #region Chart
+
+        private const int NrShowingValues = 80;
+        private double _axisMax;
+        private double _axisMin;
 
         public ChartValues<MeasureModel> ChartValues { get; set; }
         public Func<double, string> DateTimeFormatter { get; set; }
@@ -73,30 +193,28 @@ namespace LiveChartsWPF
             }
         }
 
-        public bool IsReading { get; set; }
-
-        private void Read()
+        public void ConfigureChart()
         {
-            var r = new Random();
+            var mapper = Mappers.Xy<MeasureModel>()
+                .X(model => model.DateTime.Ticks)   //use DateTime.Ticks as X
+                .Y(model => model.Value);           //use the value property as Y
 
-            while (IsReading)
-            {
-                Thread.Sleep(150);
-                var now = DateTime.Now;
+            //lets save the mapper globally.
+            Charting.For<MeasureModel>(mapper);
 
-                _trend += r.Next(-8, 10);
+            //the values property will store our values array
+            ChartValues = new ChartValues<MeasureModel>();
 
-                ChartValues.Add(new MeasureModel
-                {
-                    DateTime = now,
-                    Value = _trend
-                });
+            //lets set how to display the X Labels
+            DateTimeFormatter = value => new DateTime((long)value).ToString("mm:ss");
 
-                SetAxisLimits(now);
+            //AxisStep forces the distance between each separator in the X axis
+            AxisStep = TimeSpan.FromSeconds(1).Ticks;
+            //AxisUnit forces lets the axis know that we are plotting seconds
+            //this is not always necessary, but it can prevent wrong labeling
+            AxisUnit = TimeSpan.TicksPerSecond;
 
-                //lets only use the last 150 values
-                if (ChartValues.Count > 150) ChartValues.RemoveAt(0);
-            }
+            SetAxisLimits(DateTime.Now);
         }
 
         private void SetAxisLimits(DateTime now)
@@ -105,10 +223,18 @@ namespace LiveChartsWPF
             AxisMin = now.Ticks - TimeSpan.FromSeconds(8).Ticks; // and 8 seconds behind
         }
 
-        private void InjectStopOnClick(object sender, RoutedEventArgs e)
+        public void AddChartValue(DateTime now, double trend)
         {
-            IsReading = !IsReading;
-            if (IsReading) Task.Factory.StartNew(Read);
+            ChartValues.Add(new MeasureModel
+            {
+                DateTime = now,
+                Value = trend
+            });
+
+            SetAxisLimits(now);
+
+            //lets only use the last N values
+            if (ChartValues.Count > NrShowingValues) ChartValues.RemoveAt(0);
         }
 
         #region INotifyPropertyChanged implementation
@@ -120,6 +246,8 @@ namespace LiveChartsWPF
             if (PropertyChanged != null)
                 PropertyChanged.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
+        #endregion
 
         #endregion
     }
