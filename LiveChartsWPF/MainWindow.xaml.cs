@@ -11,6 +11,7 @@ using LiveCharts.Configurations;
 using System.Text;
 using System.Windows.Threading;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 namespace LiveChartsWPF
 {
@@ -25,11 +26,14 @@ namespace LiveChartsWPF
         private int cont = 0;
         public bool IsReading { get; set; }
 
+        Color color;
+        bool Disconnect = false;
+
         public MainWindow()
         {
             InitializeComponent();
-            /*_serialPort = new SerialPort("COM3", 115200, Parity.None, 8, StopBits.One);
-            _serialPort.ReadTimeout = 2000;*/
+            _serialPort = new SerialPort("COM3", 115200, Parity.None, 8, StopBits.One);
+            _serialPort.ReadTimeout = 2000;
             timer = new DispatcherTimer();
             timer.Tick += TimerTick;
             timer.Interval = new TimeSpan(0, 0, 1);
@@ -46,6 +50,19 @@ namespace LiveChartsWPF
         {
             int i = 0;
             bool quantDiferente = false; //flag para sinalizar que a quantidade de portas mudou
+
+            /*try
+            {
+                if (color != null) Series.Stroke = new SolidColorBrush(color);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }*/
+            if (Disconnect)
+            {
+                BtnConnect.Content = "Connect";
+            }
 
             //se a quantidade de portas mudou
             if (ComboBox1.Items.Count == SerialPort.GetPortNames().Length)
@@ -87,6 +104,7 @@ namespace LiveChartsWPF
 
             //seleciona a primeira posição da lista
             ComboBox1.SelectedIndex = 0;
+            
         }
 
         private void Read()
@@ -95,35 +113,71 @@ namespace LiveChartsWPF
 
             while (IsReading)
             {
-                
-                var now = DateTime.Now;
-                Thread.Sleep(150);
-                cont += 1;
-
-                if (cont == 10)
+                try
                 {
-                    cont = 0;
-                    _trend = r.Next(-5, 3);
+                    var now = DateTime.Now;
+                    /*Thread.Sleep(150);
+                    cont += 1;
+
+                    if (cont == 10)
+                    {
+                        cont = 0;
+                        _trend = r.Next(-5, 3);
+                    }
+
+                    AddChartValue(now, _trend);*/
+
+
+                    /* COM PORT READ */
+                    if (!_serialPort.IsOpen)
+                        _serialPort.Open();
+                    _serialPort.DiscardInBuffer();
+                    Thread.Sleep(50);
+
+                    byte[] byteBuffer = new byte[4];
+                    _serialPort.Read(byteBuffer, 0, 4);
+                    var stringValue = Encoding.ASCII.GetString(byteBuffer);
+                    double value = Convert.ToDouble(stringValue.Replace('.', ','));
+
+                    if (value > 3500.0d) value = 3500.0d;
+                    if (value < 500.0d) value = 500.0d;
+                    if (value < 2.0d)
+                    {
+                        color = new Color()
+                        {
+                            R = 0xF3,
+                            G = 0x43,
+                            B = 0x36,
+                            A = 1
+                        };
+                        //Series.Stroke = new SolidColorBrush(color);
+                        value = 2048.0d;
+                    }
+                    else
+                    {
+                        color = new Color()
+                        {
+                            R = 0x1E,
+                            G = 0x90,
+                            B = 0xFF,
+                            A = 1
+                        };
+                        //Series.Stroke = new SolidColorBrush(color);
+                    }
+
+                    _serialPort.Close();
+
+                    AddChartValue(now, value);
+                    /*****************/
                 }
-
-                AddChartValue(now, _trend);
-
-
-                /* COM PORT READ */
-                /*//if (!_serialPort.IsOpen)
-                    //_serialPort.Open();
-                _serialPort.DiscardInBuffer();
-                Thread.Sleep(2000);
-
-                byte[] byteBuffer = new byte[4];
-                _serialPort.Read(byteBuffer, 0, 4);
-                var stringValue = Encoding.ASCII.GetString(byteBuffer);
-                double value = Convert.ToDouble(stringValue.Replace('.', ','));
-                
-                //_serialPort.Close();
-
-                AddChartValue(now, value);
-                /*****************/
+                catch(Exception ex)
+                {
+                    _serialPort.Close();
+                    Disconnect = true;
+                    
+                    IsReading = false;
+                    //ConnectClick(null, new RoutedEventArgs());
+                }
             }
         }
 
@@ -131,17 +185,17 @@ namespace LiveChartsWPF
         private void ConnectClick(object sender, RoutedEventArgs e)
         {
             var portName = ComboBox1.Items[ComboBox1.SelectedIndex].ToString();
-            if (!portName.Equals("No COM Ports Available"))
+            if (portName.Equals("No COM Ports Available"))
             {
                 MessageBox.Show("There are no COM ports available to connect.", "Error", MessageBoxButton.OK, MessageBoxImage.Information, MessageBoxResult.OK, MessageBoxOptions.DefaultDesktopOnly);
                 return;
             }
-            //if (!_serialPort.IsOpen)
-            if (!isopen)
+            if (!_serialPort.IsOpen)
+            //if (!isopen)
             {
                 ComboBox1.IsEnabled = false;
-                //_serialPort.PortName = portName;
-                //_serialPort.Open();
+                _serialPort.PortName = portName;
+                _serialPort.Open();
                 IsReading = true;
                 isopen = true;
                 Task.Factory.StartNew(Read);
@@ -150,11 +204,11 @@ namespace LiveChartsWPF
             {
                 IsReading = false;
                 isopen = false;
-                //_serialPort.Close();
+                _serialPort.Close();
                 ComboBox1.IsEnabled = true;
             }
-            //BtnConnect.Content = _serialPort.IsOpen ? "Disconnect" : "Connect";
-            BtnConnect.Content = isopen ? "Disconnect" : "Connect";
+            BtnConnect.Content = _serialPort.IsOpen ? "Disconnect" : "Connect";
+            //BtnConnect.Content = isopen ? "Disconnect" : "Connect";
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -165,7 +219,7 @@ namespace LiveChartsWPF
 
         #region Chart
 
-        private const int NrShowingValues = 80;
+        private const int NrShowingValues = 150;
         private double _axisMax;
         private double _axisMin;
 

@@ -18,9 +18,9 @@
             Connect
         </Button>
         <!--Here we disable tooltips and hovering to get a better performance-->
-        <lvc:CartesianChart Grid.Row="1" AnimationsSpeed="0:0:0.4" Hoverable="False" DataTooltip="{x:Null}" Margin="0,60,0,20">
+        <lvc:CartesianChart Grid.Row="1" AnimationsSpeed="0:0:0.2" Hoverable="False" DataTooltip="{x:Null}" Margin="0,60,0,20">
             <lvc:CartesianChart.Series>
-                <lvc:LineSeries Values="{Binding ChartValues}" 
+                <lvc:LineSeries Name="Series" Values="{Binding ChartValues}" 
                                 PointGeometry="{x:Null}" 
                                 LineSmoothness="1"
                                 StrokeThickness="6" 
@@ -29,8 +29,8 @@
             </lvc:CartesianChart.Series>
             <lvc:CartesianChart.AxisY>
                 <lvc:Axis Title="Voltage (mV)"
-                          MinValue="-5"
-                          MaxValue="5">
+                          MinValue="0"
+                          MaxValue="4096">
 
                 </lvc:Axis>
             </lvc:CartesianChart.AxisY>
