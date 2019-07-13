@@ -59,10 +59,10 @@ namespace LiveChartsWPF
             {
                 Console.WriteLine(ex);
             }*/
-            if (Disconnect)
+            /*if (Disconnect)
             {
                 BtnConnect.Content = "Connect";
-            }
+            }*/
 
             //se a quantidade de portas mudou
             if (ComboBox1.Items.Count == SerialPort.GetPortNames().Length)
@@ -132,12 +132,12 @@ namespace LiveChartsWPF
                     if (!_serialPort.IsOpen)
                         _serialPort.Open();
                     _serialPort.DiscardInBuffer();
-                    Thread.Sleep(50);
+                    Thread.Sleep(150);
 
                     byte[] byteBuffer = new byte[4];
                     _serialPort.Read(byteBuffer, 0, 4);
                     var stringValue = Encoding.ASCII.GetString(byteBuffer);
-                    double value = Convert.ToDouble(stringValue.Replace('.', ','));
+                    double value = Convert.ToDouble(stringValue.Replace('.', ',').Replace('\\', Char.MinValue));
 
                     if (value > 3500.0d) value = 3500.0d;
                     if (value < 500.0d) value = 500.0d;

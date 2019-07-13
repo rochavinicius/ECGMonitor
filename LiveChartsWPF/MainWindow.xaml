@@ -13,8 +13,8 @@
             <RowDefinition Height="Auto"></RowDefinition>
             <RowDefinition Height="*"></RowDefinition>
         </Grid.RowDefinitions>
-        <ComboBox Grid.Row="1" Height="25" Width="170" Name="ComboBox1" Margin="200,0,460,400"/>
-        <Button Name="BtnConnect" Grid.Row="1" Height="25" Width="170" Click="ConnectClick" Margin="460,0,200,400">
+        <ComboBox Background="DarkBlue" Grid.Row="1" Height="25" Width="170" Name="ComboBox1" Margin="200,0,460,400"/>
+        <Button Name="BtnConnect" Background="AliceBlue" Grid.Row="1" Height="25" Width="170" Click="ConnectClick" Margin="460,0,200,400">
             Connect
         </Button>
         <!--Here we disable tooltips and hovering to get a better performance-->
@@ -30,7 +30,7 @@
             <lvc:CartesianChart.AxisY>
                 <lvc:Axis Title="Voltage (mV)"
                           MinValue="0"
-                          MaxValue="4096">
+                          MaxValue="4095">
 
                 </lvc:Axis>
             </lvc:CartesianChart.AxisY>
